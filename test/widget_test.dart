@@ -1,30 +1,60 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 
-import 'package:island_link/main.dart';
+import 'package:island_link/link.dart';
+import 'package:island_link/screens/home.dart';
+import 'package:island_link/screens/welcome.dart';
+import 'package:island_link/theme.dart';
+import 'package:island_link/widgets/app_icon.dart';
+
+Widget _app(Widget child) => MaterialApp(theme: Cozy.theme(), home: child);
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('welcome invites the user to scan', (tester) async {
+    await tester.pumpWidget(_app(const WelcomeScreen()));
+    expect(find.text('Hi there!'), findsOneWidget);
+    expect(find.bySemanticsLabel('Scan PC code'), findsOneWidget);
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('welcome explains when the PC forgot the phone', (tester) async {
+    await tester.pumpWidget(_app(const WelcomeScreen(note: 'Your PC forgot this phone.')));
+    expect(find.text('Oh no!'), findsOneWidget);
+    expect(find.text('Your PC forgot this phone.'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('home shows the PC and its link status', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2424); // Pixel 9
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_app(const HomeScreen(link: LinkState(LinkStatus.connected, pc: 'Gamer'))));
+    expect(find.bySemanticsLabel('Gamer, Connected'), findsOneWidget);
+    expect(find.text('Terminal'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('only Island Link codes are accepted', () {
+    expect(Link.looksLikePairCode('islandlink://pair?v=1&h=1.2.3.4'), isTrue);
+    expect(Link.looksLikePairCode('https://example.com'), isFalse);
+    expect(Link.looksLikePairCode(null), isFalse);
+  });
+
+  testWidgets('home fits sideways too', (tester) async {
+    tester.view.physicalSize = const Size(2424, 1080);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_app(const HomeScreen(link: LinkState(LinkStatus.offline, pc: 'Gamer'))));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('icon tiles fill their square and draw their art', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        Center(
+          child: AppIcon(label: 'Files', art: Art.files, color: Cozy.sky, size: 76, onTap: () {}),
+        ),
+      ),
+    );
+    final art = find.descendant(of: find.byType(AppIcon), matching: find.byType(CustomPaint)).first;
+    expect(tester.getSize(art).width, greaterThan(40)); // was 0 when the tile collapsed
   });
 }
