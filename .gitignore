@@ -9,3 +9,8 @@ captures/
 *.aab
 *.keystore
 *.jks
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
