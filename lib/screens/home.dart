@@ -45,6 +45,24 @@ class _HomeScreenState extends State<HomeScreen> {
       );
   }
 
+  Future<void> _sendFiles() async {
+    final n = await Link.pickAndSendFiles();
+    if (!mounted || n == 0) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Cozy.ink,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Text(
+            n == 1 ? 'Sending 1 file to your PC…' : 'Sending $n files to your PC…',
+            style: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+  }
+
   void _settings() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
 
   List<AppIcon> get _apps {
@@ -57,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
       app('Music', Art.music, const Color(0xFFA68BD6)),
       app('Power', Art.power, const Color(0xFFE88D7E)),
       app('Terminal', Art.terminal, const Color(0xFF7FA88A)),
-      app('Files', Art.files, const Color(0xFF8EC5E8)),
+      app('Files', Art.files, const Color(0xFF8EC5E8), _sendFiles),
       app('Clipboard', Art.clipboard, const Color(0xFFF3A6C0)),
       app('Settings', Art.settings, const Color(0xFFC9A27E), _settings),
     ];

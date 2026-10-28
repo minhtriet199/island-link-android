@@ -7,4 +7,14 @@
     <string name="link_offline">Can\'t reach %1$s, trying again</string>
     <string name="link_forgotten">Your PC forgot this phone. Scan a new code to pair again.</string>
     <string name="link_pair_failed">Couldn\'t reach your PC. Are you on the same Wi-Fi?</string>
+    <string name="files_channel">Sending files</string>
+    <string name="files_sending">Sending %1$d file(s) to %2$s…</string>
+    <string name="files_sending_one">Sending %1$s…</string>
+    <plurals name="files_sent">
+        <item quantity="one">Sent %1$d file to %2$s</item>
+        <item quantity="other">Sent %1$d files to %2$s</item>
+    </plurals>
+    <string name="files_failed">Couldn\'t send: %1$s</string>
+    <string name="files_not_paired">Pair Island Link with your PC first.</string>
+    <string name="files_nothing">There was nothing to send.</string>
 </resources>

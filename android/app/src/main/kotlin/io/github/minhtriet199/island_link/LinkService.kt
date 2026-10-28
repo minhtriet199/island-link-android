@@ -27,6 +27,7 @@ class LinkService : Service() {
     @Volatile private var running = false
     @Volatile private var connection: Connection? = null
     private var worker: Thread? = null
+    private val files by lazy { FileSender(this) }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -42,6 +43,7 @@ class LinkService : Service() {
             running = true
             worker = Thread({ loop(pairing) }, "island-link").apply { start() }
         }
+        if (intent?.action == FileSender.ACTION_SEND) files.send(FileSender.urisOf(intent))
         return START_STICKY
     }
 
@@ -49,6 +51,7 @@ class LinkService : Service() {
         running = false
         connection?.close()
         worker?.interrupt()
+        files.shutdown()
         if (Pairing.load(this) != null) publish(LinkStatus.OFFLINE, null, null)
         super.onDestroy()
     }

@@ -6,6 +6,7 @@ import android.os.Build
 import android.util.Base64
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -73,10 +74,35 @@ class Connection private constructor(private val socket: SSLSocket) : AutoClosea
         return reader.readLine()?.let(::JSONObject)
     }
 
+    /**
+     * Streams one file after a {"t":"file"} header and waits for the PC to confirm.
+     * Returns the name the PC saved it under (it may add " (2)").
+     */
+    fun sendFile(name: String, size: Long, input: InputStream, onProgress: (sent: Long) -> Unit): String {
+        synchronized(out) {
+            out.write((JSONObject().put("t", "file").put("name", name).put("size", size).toString() + "\n")
+                .toByteArray(Charsets.UTF_8))
+            val buf = ByteArray(64 * 1024)
+            var sent = 0L
+            while (sent < size) {
+                val n = input.read(buf, 0, minOf(buf.size.toLong(), size - sent).toInt())
+                if (n < 0) throw LinkError("$name got shorter while sending.")
+                out.write(buf, 0, n)
+                sent += n
+                onProgress(sent)
+            }
+            out.flush()
+        }
+        val reply = receive(SAVE_TIMEOUT_MS) ?: throw LinkError("The PC closed the connection.")
+        if (reply.optString("t") != "saved") throw LinkError(reply.optString("msg", "The PC didn't save $name."))
+        return reply.optString("name", name)
+    }
+
     override fun close() = runCatching { socket.close() }.let { }
 
     companion object {
         private const val CONNECT_TIMEOUT_MS = 5_000
+        private const val SAVE_TIMEOUT_MS = 60_000
 
         fun open(host: String, port: Int, fingerprint: String): Connection {
             val tls = SSLContext.getInstance("TLSv1.3")

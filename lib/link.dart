@@ -48,6 +48,10 @@ abstract final class Link {
   /// Makes sure the background link runs (no-op when not paired).
   static Future<void> start() => _methods.invokeMethod('start');
 
+  /// Opens the system file picker; whatever is picked is sent to the PC in the background
+  /// (progress shows as a notification). Returns how many files were picked.
+  static Future<int> pickAndSendFiles() async => await _methods.invokeMethod<int>('pickFiles') ?? 0;
+
   /// Forgets the PC on this phone and stops the link.
   static Future<void> forget() => _methods.invokeMethod('forget');
 

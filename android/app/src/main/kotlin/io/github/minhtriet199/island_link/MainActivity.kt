@@ -1,6 +1,7 @@
 package io.github.minhtriet199.island_link
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
@@ -11,11 +12,12 @@ import java.util.concurrent.Executors
 
 /**
  * Bridge between the Flutter UI and the native link (see lib/link.dart):
- *   island_link/link    methods: status, pair(uri), start, forget
+ *   island_link/link    methods: status, pair(uri), start, forget, pickFiles
  *   island_link/status  stream of {status, pc, error}
  */
 class MainActivity : FlutterActivity() {
     private val io = Executors.newSingleThreadExecutor()
+    private var pickResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(engine: FlutterEngine) {
         super.configureFlutterEngine(engine)
@@ -41,6 +43,17 @@ class MainActivity : FlutterActivity() {
                     if (Pairing.load(this) != null) startLink()
                     result.success(null)
                 }
+                "pickFiles" -> {
+                    pickResult?.success(0) // a second tap replaces a picker that never answered
+                    pickResult = result
+                    startActivityForResult(
+                        Intent(Intent.ACTION_OPEN_DOCUMENT)
+                            .addCategory(Intent.CATEGORY_OPENABLE)
+                            .setType("*/*")
+                            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true),
+                        PICK_FILES,
+                    )
+                }
                 "forget" -> {
                     LinkService.stop(this)
                     Pairing.clear(this)
@@ -61,6 +74,17 @@ class MainActivity : FlutterActivity() {
                 LinkEvents.listener = null
             }
         })
+    }
+
+    /** Files picked from the Files icon go to the PC like shared ones. Replies with how many. */
+    @Deprecated("FlutterActivity is not a ComponentActivity, so no ActivityResult API here")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PICK_FILES) return
+        val uris = if (resultCode == RESULT_OK && data != null) FileSender.urisOf(data) else emptyList()
+        FileSender.start(this, uris)
+        pickResult?.success(uris.size)
+        pickResult = null
     }
 
     override fun onDestroy() {
@@ -84,5 +108,9 @@ class MainActivity : FlutterActivity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         LinkService.start(this)
+    }
+
+    companion object {
+        private const val PICK_FILES = 7
     }
 }
