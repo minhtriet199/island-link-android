@@ -17,4 +17,16 @@
     <string name="files_failed">Couldn\'t send: %1$s</string>
     <string name="files_not_paired">Pair Island Link with your PC first.</string>
     <string name="files_nothing">There was nothing to send.</string>
+    <string name="dl_channel">Download mode</string>
+    <string name="dl_alert_channel">PC about to shut down</string>
+    <string name="dl_title">Downloading on %1$s</string>
+    <string name="dl_waiting">Waiting for a download to start…</string>
+    <string name="dl_finishing">Finishing up…</string>
+    <string name="dl_stop">Stop</string>
+    <string name="dl_then_shutdown">Shut down after</string>
+    <string name="dl_then_keep">Keep PC on after</string>
+    <string name="dl_done">Downloads finished</string>
+    <string name="dl_asking">%1$s will shut down in %2$s</string>
+    <string name="dl_keep">Keep using</string>
+    <string name="dl_shutdown">Shut down now</string>
 </resources>

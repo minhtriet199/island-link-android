@@ -107,7 +107,10 @@ class Connection private constructor(private val socket: SSLSocket) : AutoClosea
         fun open(host: String, port: Int, fingerprint: String): Connection {
             val tls = SSLContext.getInstance("TLSv1.3")
             tls.init(null, arrayOf(PinnedTrust(fingerprint)), SecureRandom())
-            val raw = Socket().apply { connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS) }
+            val raw = Socket().apply {
+                tcpNoDelay = true // touchpad moves shouldn't wait to fill a packet
+                connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
+            }
             val socket = tls.socketFactory.createSocket(raw, host, port, true) as SSLSocket
             socket.soTimeout = CONNECT_TIMEOUT_MS
             socket.startHandshake()

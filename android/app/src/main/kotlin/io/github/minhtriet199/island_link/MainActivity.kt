@@ -1,19 +1,27 @@
 package io.github.minhtriet199.island_link
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.biometrics.BiometricManager
+import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
+import android.os.CancellationSignal
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONObject
 import java.util.concurrent.Executors
 
 /**
  * Bridge between the Flutter UI and the native link (see lib/link.dart):
- *   island_link/link    methods: status, pair(uri), start, forget, pickFiles
+ *   island_link/link    methods: status, pair(uri), start, forget, pickFiles, send(json), lastDownload,
+ *                       terminalAllowed, alertsAccess, openAlertsAccess, alertsOn, setAlertsOn, authenticate
  *   island_link/status  stream of {status, pc, error}
+ *   island_link/msg     stream of the PC's messages (JSON text) while the app is open
  */
 class MainActivity : FlutterActivity() {
     private val io = Executors.newSingleThreadExecutor()
@@ -54,6 +62,20 @@ class MainActivity : FlutterActivity() {
                         PICK_FILES,
                     )
                 }
+                "send" -> result.success(LinkService.current?.send(JSONObject(call.arguments as String)) ?: false)
+                "lastDownload" -> result.success(LinkEvents.lastDownload)
+                "terminalAllowed" -> result.success(LinkEvents.terminal)
+                "alertsAccess" -> result.success(alertsAccess())
+                "openAlertsAccess" -> {
+                    startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    result.success(null)
+                }
+                "alertsOn" -> result.success(NotifyListener.isOn(this))
+                "setAlertsOn" -> {
+                    NotifyListener.setOn(this, call.arguments as Boolean)
+                    result.success(null)
+                }
+                "authenticate" -> authenticate(call.arguments as String) { result.success(it) }
                 "forget" -> {
                     LinkService.stop(this)
                     Pairing.clear(this)
@@ -63,6 +85,16 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        EventChannel(messenger, "island_link/msg").setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
+                LinkEvents.messages = { sink.success(it) }
+            }
+
+            override fun onCancel(arguments: Any?) {
+                LinkEvents.messages = null
+            }
+        })
 
         EventChannel(messenger, "island_link/status").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
@@ -89,8 +121,38 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         LinkEvents.listener = null
+        LinkEvents.messages = null
         io.shutdown()
         super.onDestroy()
+    }
+
+    private fun alertsAccess(): Boolean {
+        val mine = ComponentName(this, NotifyListener::class.java).flattenToString()
+        return Settings.Secure.getString(contentResolver, "enabled_notification_listeners")?.contains(mine) == true
+    }
+
+    /** Fingerprint (or the screen lock) before anything sensitive. Fails closed where it can't ask. */
+    private fun authenticate(reason: String, done: (Boolean) -> Unit) {
+        if (Build.VERSION.SDK_INT < 28) return done(false)
+        val builder = BiometricPrompt.Builder(this).setTitle(reason)
+        if (Build.VERSION.SDK_INT >= 30) {
+            builder.setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+        } else {
+            @Suppress("DEPRECATION") builder.setDeviceCredentialAllowed(true)
+        }
+        var answered = false
+        fun once(ok: Boolean) {
+            if (!answered) {
+                answered = true
+                done(ok)
+            }
+        }
+        builder.build().authenticate(CancellationSignal(), mainExecutor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = once(true)
+            override fun onAuthenticationError(code: Int, message: CharSequence) = once(false)
+        })
     }
 
     /** Paired but the service hasn't reported yet → show the PC name while it connects. */
