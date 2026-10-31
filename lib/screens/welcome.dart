@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import '../widgets/page.dart';
 import 'scan.dart';
 
 /// First screen when the phone isn't paired yet.
@@ -14,57 +15,41 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: DottedPaper(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Align(alignment: Alignment.centerLeft, child: AppTag()),
-              const Expanded(child: Center(child: IslandArt())),
-              SpeechBubble(
-                tag: note == null ? 'Hi there!' : 'Oh no!',
-                text:
-                    note ??
-                    "Let's meet your PC! On your laptop, open Island's Phone Link to show a code, then scan it here.",
+        child: Column(
+          children: [
+            const SizedBox(height: 14),
+            const IslandLogo(),
+            const SizedBox(height: 16),
+            Expanded(
+              child: CozyPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Expanded(child: Center(child: IslandArt())),
+                    SpeechBubble(
+                      tag: note == null ? 'Hi there!' : 'Oh no!',
+                      text:
+                          note ??
+                          "Let's meet your PC! Open Settings → Phone Link in Island to show a code, then scan it here.",
+                    ),
+                    const SizedBox(height: 22),
+                    BubbleButton(
+                      label: 'Scan PC code',
+                      icon: Icons.qr_code_scanner_rounded,
+                      onPressed: () =>
+                          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ScanScreen())),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 28),
-              BubbleButton(
-                label: 'Scan PC code',
-                icon: Icons.qr_code_scanner_rounded,
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ScanScreen())),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// "Island Link" pill with the leaf, top left on the main screens.
-class AppTag extends StatelessWidget {
-  const AppTag({super.key});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(10, 8, 16, 8),
-    decoration: BoxDecoration(
-      color: Cozy.card,
-      borderRadius: BorderRadius.circular(999),
-      boxShadow: const [BoxShadow(color: Cozy.cardShadow, offset: Offset(0, 4))],
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Leaf(),
-        const SizedBox(width: 8),
-        Text('Island Link', style: Theme.of(context).textTheme.titleLarge),
-      ],
-    ),
-  );
-}
-
-/// A little island with a laptop and a phone joined by a dotted line.
 class IslandArt extends StatefulWidget {
   const IslandArt({super.key, this.bob = true});
 

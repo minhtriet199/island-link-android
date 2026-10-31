@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../link.dart';
 import '../theme.dart';
+import '../widgets/page.dart';
 import '../widgets/pc_card.dart';
 
-/// Settings. Step 1 only has the PC itself; each feature adds its own group later.
+/// Settings: the PC this phone is paired with.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -35,42 +36,30 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: DottedPaper(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-          children: [
-            Row(
-              children: [
-                RoundButton(
-                  icon: Icons.arrow_back_rounded,
-                  tooltip: 'Back',
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-                const SizedBox(width: 14),
-                Text('Settings', style: Theme.of(context).textTheme.headlineMedium),
-              ],
-            ),
-            const SizedBox(height: 22),
-            Text('Your PC', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 19)),
-            const SizedBox(height: 10),
-            StreamBuilder<LinkState>(
-              stream: Link.states,
-              builder: (_, snap) => PcCard(link: snap.data ?? const LinkState(LinkStatus.connecting)),
-            ),
-            const SizedBox(height: 30),
-            BubbleButton(
-              label: 'Forget this PC',
-              color: Cozy.card,
-              ledge: Cozy.cardShadow,
-              textColor: Cozy.danger,
-              height: 58,
-              onPressed: () => _forget(context),
-            ),
-            const SizedBox(height: 18),
-            Center(child: Text('Island Link 0.1 · made with a leaf', style: Theme.of(context).textTheme.bodySmall)),
-          ],
-        ),
+    return CozyPage(
+      title: 'Settings',
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          Text('Your PC', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 19)),
+          const SizedBox(height: 10),
+          StreamBuilder<LinkState>(
+            stream: Link.states,
+            initialData: Link.last,
+            builder: (_, snap) => PcCard(link: snap.data!),
+          ),
+          const SizedBox(height: 30),
+          BubbleButton(
+            label: 'Forget this PC',
+            color: Cozy.card,
+            ledge: Cozy.cardShadow,
+            textColor: Cozy.danger,
+            height: 58,
+            onPressed: () => _forget(context),
+          ),
+          const SizedBox(height: 18),
+          Center(child: Text('Island Link 0.2.2 · made with a leaf', style: Theme.of(context).textTheme.bodySmall)),
+        ],
       ),
     );
   }

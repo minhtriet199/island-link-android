@@ -5,14 +5,36 @@ import 'screens/home.dart';
 import 'screens/welcome.dart';
 import 'theme.dart';
 
+final messenger = GlobalKey<ScaffoldMessengerState>();
+
+/// A small bubble at the bottom of whichever screen is open.
+void toast(String text) => messenger.currentState
+  ?..hideCurrentSnackBar()
+  ..showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Cozy.ink,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      content: Text(
+        text,
+        style: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w800),
+      ),
+    ),
+  );
+
 void main() => runApp(const IslandLinkApp());
 
 class IslandLinkApp extends StatelessWidget {
   const IslandLinkApp({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      MaterialApp(title: 'Island Link', debugShowCheckedModeBanner: false, theme: Cozy.theme(), home: const LinkGate());
+  Widget build(BuildContext context) => MaterialApp(
+    title: 'Island Link',
+    debugShowCheckedModeBanner: false,
+    theme: Cozy.theme(),
+    scaffoldMessengerKey: messenger,
+    home: const LinkGate(),
+  );
 }
 
 /// Shows Welcome until the phone is paired, then Home; follows the link live.
@@ -28,6 +50,7 @@ class _LinkGateState extends State<LinkGate> {
   void initState() {
     super.initState();
     Link.start(); // paired already? make sure the background link runs
+    Link.on('toast').listen((m) => toast(m['msg'] as String));
   }
 
   @override

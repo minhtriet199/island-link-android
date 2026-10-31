@@ -209,13 +209,18 @@ class _BubbleButtonState extends State<BubbleButton> {
                             Icon(widget.icon, color: widget.textColor, size: 26),
                             const SizedBox(width: 12),
                           ],
-                          Text(
-                            widget.label,
-                            style: TextStyle(
-                              fontFamily: 'Fredoka',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 21,
-                              color: widget.textColor,
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                widget.label,
+                                style: TextStyle(
+                                  fontFamily: 'Fredoka',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 21,
+                                  color: widget.textColor,
+                                ),
+                              ),
                             ),
                           ),
                         ],

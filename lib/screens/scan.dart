@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../link.dart';
 import '../theme.dart';
+import '../widgets/page.dart';
 
 /// Camera view that reads the PC's pairing QR and pairs right away.
 class ScanScreen extends StatefulWidget {
@@ -67,46 +68,35 @@ class _ScanScreenState extends State<ScanScreen> {
       _ => ('Almost there', "Point me at the code on your PC screen. I'll do the rest, no typing needed!", Cozy.sky),
     };
 
-    return Scaffold(
-      body: DottedPaper(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return CozyPage(
+      title: 'Scan the code',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _Viewfinder(camera: _camera, onDetect: _onDetect),
+          ),
+          const SizedBox(height: 22),
+          SpeechBubble(tag: tag, text: text, tagColor: tagColor, tilt: 0.04),
+          if (_error != null) ...[
+            const SizedBox(height: 22),
+            BubbleButton(label: 'Try again', icon: Icons.refresh_rounded, onPressed: _retry),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  RoundButton(
-                    icon: Icons.arrow_back_rounded,
-                    tooltip: 'Back',
-                    onPressed: () => Navigator.of(context).maybePop(),
-                  ),
-                  const SizedBox(width: 14),
-                  Text('Scan the code', style: Theme.of(context).textTheme.headlineMedium),
-                ],
-              ),
-              const SizedBox(height: 22),
-              Expanded(
-                child: _Viewfinder(camera: _camera, onDetect: _onDetect),
-              ),
-              const SizedBox(height: 30),
-              SpeechBubble(tag: tag, text: text, tagColor: tagColor, tilt: 0.04),
-              if (_error != null) ...[
-                const SizedBox(height: 22),
-                BubbleButton(label: 'Try again', icon: Icons.refresh_rounded, onPressed: _retry),
-              ],
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.lock_outline_rounded, size: 18, color: Cozy.inkSoft),
-                  const SizedBox(width: 6),
-                  Text('Only your PC and phone can talk to each other', style: Theme.of(context).textTheme.bodySmall),
-                ],
+              const Icon(Icons.lock_outline_rounded, size: 18, color: Cozy.inkSoft),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'Only your PC and phone can talk to each other',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
