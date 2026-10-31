@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The leaf on green; Android crops it to the phone's icon shape and tints it for themed icons. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/icon_background" />
+    <foreground android:drawable="@drawable/ic_launcher_leaf" />
+    <monochrome android:drawable="@drawable/ic_launcher_leaf" />
+</adaptive-icon>
