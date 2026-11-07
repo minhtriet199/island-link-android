@@ -18,6 +18,8 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import org.json.JSONObject
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.SocketTimeoutException
 import java.util.concurrent.Executors
 
@@ -35,6 +37,9 @@ class LinkService : Service() {
     private var worker: Thread? = null
     @Volatile private var sleeping = false
     @Volatile private var statusText: String? = null // a repeat start must not turn "Connected" back into "Looking"
+    @Volatile private var down = false   // the last try failed: retries stay quiet in the notification
+    @Volatile private var pcOff = false  // the PC said bye: wait for its knock instead of retrying often
+    @Volatile private var knocks: DatagramSocket? = null
     private val files by lazy { FileSender(this) }
     private val downloads by lazy { DownloadNotifier(this) }
     private val outbox = Executors.newSingleThreadExecutor() // sockets can't be written on the UI thread
@@ -48,6 +53,7 @@ class LinkService : Service() {
         super.onCreate()
         current = this
         registerReceiver(batteryChanged, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        registerReceiver(unlocked, IntentFilter(Intent.ACTION_USER_PRESENT))
         getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkBack)
     }
 
@@ -62,6 +68,9 @@ class LinkService : Service() {
         if (worker?.isAlive != true) {
             running = true
             worker = Thread({ loop(pairing) }, "island-link").apply { start() }
+            Thread({ listenForKnocks(pairing) }, "island-link-knock").apply { isDaemon = true; start() }
+        } else {
+            tryNow() // the app was opened: don't make the user wait out the backoff
         }
         when (intent?.action) {
             FileSender.ACTION_SEND -> files.send(FileSender.urisOf(intent))
@@ -74,6 +83,8 @@ class LinkService : Service() {
         running = false
         current = null
         unregisterReceiver(batteryChanged)
+        unregisterReceiver(unlocked)
+        knocks?.close()
         getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkBack)
         connection?.close()
         worker?.interrupt()
@@ -111,10 +122,36 @@ class LinkService : Service() {
         if (batteryLevel >= 0) send(JSONObject().put("t", "battery").put("level", batteryLevel).put("charging", batteryCharging))
     }
 
-    /** The network came back: try now instead of finishing the backoff (timers pause while the phone sleeps). */
+    /** Waiting between tries: try right away instead (timers also pause while the phone sleeps). */
+    private fun tryNow() {
+        if (sleeping) worker?.interrupt()
+    }
+
+    /** The network came back. */
     private val networkBack = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) {
-            if (sleeping) worker?.interrupt()
+        override fun onAvailable(network: Network) = tryNow()
+    }
+
+    /** The phone was unlocked: a cheap moment to check, the screen and Wi-Fi are on anyway. */
+    private val unlocked = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = tryNow()
+    }
+
+    /**
+     * The PC knocks (a small UDP packet) when it starts or wakes up, so the phone doesn't have to keep
+     * asking. Only knocks from the paired PC's address count; a knock only starts the normal checked link.
+     */
+    private fun listenForKnocks(pairing: Pairing) {
+        val socket = runCatching { DatagramSocket(KNOCK_PORT) }.getOrNull() ?: return
+        knocks = socket
+        val buf = ByteArray(64)
+        while (running) {
+            val packet = DatagramPacket(buf, buf.size)
+            if (runCatching { socket.receive(packet) }.isFailure) return // closed in onDestroy
+            if (packet.address?.hostAddress == pairing.host) {
+                pcOff = false
+                tryNow()
+            }
         }
     }
 
@@ -133,27 +170,36 @@ class LinkService : Service() {
                     }
                     connection = c // only now: nothing else may reach the PC before the hello
                     LinkEvents.terminal = reply.optBoolean("terminal")
+                    down = false
+                    pcOff = false
                     publish(LinkStatus.CONNECTED, reply.optString("pc", pairing.pcName), null)
                     backoffMs = 1_000L
                     sendBattery()
                     watching.forEach { send(JSONObject().put("t", "watch").put("what", it).put("on", true)) }
                     talk(c)
                 }
+                if (!running) return
+                down = true
+                publish(LinkStatus.OFFLINE, pairing.pcName, null)
             } catch (e: Exception) {
                 if (!running) return
+                down = true
                 publish(LinkStatus.OFFLINE, pairing.pcName, e.message)
             } finally {
                 connection = null
             }
+            // the PC said bye: it knocks when it's back, so only check now and then (unlock / Wi-Fi also try)
+            val wait = if (pcOff) MAX_BACKOFF_MS else backoffMs
             try {
                 sleeping = true
-                Thread.sleep(backoffMs)
+                Thread.sleep(wait)
+                backoffMs = (backoffMs * 2).coerceAtMost(MAX_BACKOFF_MS)
             } catch (_: InterruptedException) {
                 if (!running) return
+                backoffMs = 1_000L // something changed (knock, Wi-Fi, unlock, app opened): start fresh
             } finally {
                 sleeping = false
             }
-            backoffMs = (backoffMs * 2).coerceAtMost(MAX_BACKOFF_MS)
         }
     }
 
@@ -170,6 +216,7 @@ class LinkService : Service() {
             }
             when (msg.optString("t")) {
                 "ping" -> send(JSONObject().put("t", "pong"))
+                "bye" -> { pcOff = true; return }
                 "pong" -> Unit
                 "error" -> if (msg.optString("msg") == "unpaired") return forgotten()
                 "dl" -> {
@@ -197,11 +244,13 @@ class LinkService : Service() {
     private fun publish(status: LinkStatus, pc: String?, error: String?) {
         LinkEvents.post(status, pc, error)
         if (status == LinkStatus.UNPAIRED || !running) return
+        if (status == LinkStatus.CONNECTING && down) return // retries keep the "can't reach" line instead of flickering
         val text = when (status) {
             LinkStatus.CONNECTED -> getString(R.string.link_connected, pc)
             LinkStatus.CONNECTING -> getString(R.string.link_connecting, pc)
-            else -> getString(R.string.link_offline, pc)
+            else -> getString(if (pcOff) R.string.link_pc_off else R.string.link_offline, pc)
         }
+        if (text == statusText) return
         statusText = text
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
     }
@@ -230,6 +279,7 @@ class LinkService : Service() {
             .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .build()
     }
 
@@ -238,7 +288,8 @@ class LinkService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val HELLO_TIMEOUT_MS = 5_000
         private const val DEAD_AFTER_MS = 70_000
-        private const val MAX_BACKOFF_MS = 30_000L
+        private const val MAX_BACKOFF_MS = 15 * 60_000L // rare on its own: knocks, unlock and Wi-Fi bring it back sooner
+        private const val KNOCK_PORT = 47801 // the PC's wake.go knocks here
 
         const val ACTION_DO = "io.github.minhtriet199.island_link.DO"
         const val EXTRA_WHAT = "what"

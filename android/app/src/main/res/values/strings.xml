@@ -5,6 +5,7 @@
     <string name="link_connecting">Looking for %1$s…</string>
     <string name="link_connected">Connected to %1$s</string>
     <string name="link_offline">Can\'t reach %1$s, trying again</string>
+    <string name="link_pc_off">%1$s is off. Connects again when it\'s back</string>
     <string name="link_forgotten">Your PC forgot this phone. Scan a new code to pair again.</string>
     <string name="link_pair_failed">Couldn\'t reach your PC. Are you on the same Wi-Fi?</string>
     <string name="files_channel">Sending files</string>
